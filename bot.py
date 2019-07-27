@@ -161,23 +161,23 @@ async def r(ctx):
             name = parts[1].strip()
         else:
             name = None
-        roll = Roll(parts[0])
+        roll = Roll(parts[0].strip())
         id = str(ctx.author.id)
         if id not in names and name is None:
             message = "{}: `{}` = {} = {}".format(ctx.author.mention,
-                                                  input_str,
+                                                  parts[0].strip(),
                                                   roll.out_str,
                                                   roll.final_result)
         elif name is not None:
             message = "{} ({}): `{}` = {} = {}".format(ctx.author.mention,
                                                        name,
-                                                       input_str,
+                                                       parts[0].strip(),
                                                        roll.out_str,
                                                        roll.final_result)
         else:
             message = "{} ({}): `{}` = {} = {}".format(ctx.author.mention,
                                                        names[id],
-                                                       input_str,
+                                                       parts[0].strip(),
                                                        roll.out_str,
                                                        roll.final_result)
         if len(message) > 2000:
