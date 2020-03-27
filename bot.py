@@ -37,6 +37,9 @@ async def addname(ctx):
 
 def addname_cmd(id, name):
     global names
+    with open("names.json", "r") as file:
+        names_txt = file.read()
+        names = json.loads(names_txt)
     if id not in names:
         names[id] = name
         return True
@@ -59,6 +62,9 @@ async def editname(ctx):
 
 def editname_cmd(id, name):
     global names
+    with open("names.json", "r") as file:
+        names_txt = file.read()
+        names = json.loads(names_txt)
     if id in names:
         names[id] = name
         return True
@@ -80,6 +86,9 @@ async def deletename(ctx):
 
 def deletename_cmd(id):
     global names
+    with open("names.json", "r") as file:
+        names_txt = file.read()
+        names = json.loads(names_txt)
     if id in names:
         del names[id]
         return True
@@ -101,6 +110,9 @@ async def getname(ctx, name=None):
 
 def getname_cmd(id):
     global names
+    with open("names.json", "r") as file:
+        names_txt = file.read()
+        names = json.loads(names_txt)
     if id in names:
         return (True, names[id])
     else:
@@ -153,6 +165,10 @@ async def name(ctx):
 
 @bot.command()
 async def r(ctx):
+    global names
+    with open("names.json", "r") as file:
+        names_txt = file.read()
+        names = json.loads(names_txt)
     await ctx.trigger_typing()
     input_str = ctx.message.content[3:]
     try:
@@ -181,7 +197,7 @@ async def r(ctx):
                                                        roll.out_str,
                                                        roll.final_result)
         if len(message) > 2000:
-            await ctx.send(("{}: You rolling way too many dice my dude,",
+            await ctx.send(("{}: You're rolling way too many dice my dude,"
                             " the result can't be displayed").format(
                             ctx.author.mention))
             return
@@ -198,4 +214,4 @@ async def r(ctx):
 async def info(ctx):
     await ctx.send(str(ctx.guild.members))
 
-bot.run('MzQ4NTUxNTE1NjI1MDk1MTc4.XTUgtA.rrolOudLlsU8K9VwmngtWKGPhZ8')
+bot.run('Your Token Here')
