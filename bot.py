@@ -210,8 +210,4 @@ async def r(ctx):
         await ctx.send("{}: You fucked up".format(ctx.message.author.mention))
 
 
-@bot.command()
-async def info(ctx):
-    await ctx.send(str(ctx.guild.members))
-
 bot.run('Your Token Here')
