@@ -1,2 +1,4 @@
-pipenv install
-pipenv run python bot.py
+@echo off
+cd "%~dp0"
+CALL env\scripts\activate.bat
+python bot.py
