@@ -451,6 +451,7 @@ def viewroll_cmd(id):
     elif len(data[id]["rolls"]) > 0:
         message_list = ["{}: {}".format(k, v) for k, v in data[id]["rolls"].items()]
         message = "\n".join(message_list)
+        message = "```" + message + "```"
         return (1, message) # return all rolls
     else:
         return (2, "") # no rolls to show
