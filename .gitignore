@@ -109,7 +109,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-# .env
+.env
 .env/
 .venv/
 env/
@@ -153,4 +153,3 @@ Thumbs.db
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 *.json
-.env

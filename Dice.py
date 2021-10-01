@@ -5,36 +5,111 @@ Created on Sun Jul 21 23:31:54 2019
 @author: Natha
 """
 
-from random import randint
+from random import randint, shuffle
 import re
 from collections import OrderedDict, deque
 
 
 class Dice(object):
-    def __init__(self, num, val):
-        self.num = num
-        self.val = val
+    def __init__(self, dice_string):
+        self.dice_string = dice_string
+        if dice_string[0] == "-":
+            self.dice_string = self.dice_string[1:]
+        self.processDiceTokens()
+        # print(self.num)
+        # print(self.sides)
+        # print(self.operations)
+
+    def processDiceTokens(self):
+        # Get dice from dice_string
+        dice_regex = re.compile(r"^([0-9]*)(d[0-9]+)(.*)", re.IGNORECASE)
+        num, sides, end = dice_regex.match(self.dice_string).group(1, 2, 3)
+        self.num = int(num)
+        self.sides = int(sides[1:])
+
+        # Get the additional operations to perform on the dice
+        self.operations = []
+        op_string = end
+        if op_string == "!":
+            self.operations = ["!"]
+            return
+        # If the dice explodes, that should be the only operation, else
+        # find all the operations, these are of the form
+        # kh[0-9]+, kl[0-9]+, dh[0-9]+, kl[0-9]+
+        op_regex = re.compile("(kh|kl|dh|dl)([0-9]+)(.*)", re.IGNORECASE)
+        while len(op_string) != 0:
+            op, num, end = op_regex.match(op_string).group(1, 2, 3)
+            self.operations.append((op, int(num)))
+            op_string = end
+
 
     def roll(self):
-        results = []
+        values = []
         i = 0
         while i < self.num:
-            results.append(randint(1, self.val))
+            values.append(randint(1, self.sides))
             i += 1
-        return results
+        if len(self.operations) == 0:
+            # No operations so simply construct token string
+            token_str = "(" + "+".join([str(x) for x in values]) + ")"
+            return values, token_str
+        elif self.operations[0] == "!":
+            # Explode the dice
+            additional_rolls = sum([1 for val in values if val == self.sides]) # number of dice with max roll
+            while additional_rolls != 0:
+                new_roll = randint(1, self.sides)
+                values.append(new_roll)
+                if new_roll < self.sides:
+                    additional_rolls -= 1
+
+            #create token string
+            token_str = "(" + "+".join([str(x) for x in values]) + ")"
+            return values, token_str
+        else:
+            sorted_values = sorted(values)
+            start_index = 0
+            end_index = len(sorted_values)
+            for op, num in self.operations:
+                if op == "kh":
+                    start_index = max(start_index, end_index - num)
+                elif op == "kl":
+                    end_index = min(end_index, start_index + num)
+                elif op == "dh":
+                    end_index = end_index - num
+                elif op == "dl":
+                    start_index = start_index + num
+
+
+            values = sorted_values[start_index:end_index]
+
+            token_str_tokens = []
+            for i in range(len(sorted_values)):
+                val = sorted_values[i]
+                if i < start_index or i >= end_index:
+                    token_str_tokens.append("~~{}~~".format(val))
+                else:
+                    token_str_tokens.append(str(val))
+            shuffle(token_str_tokens)
+
+            token_str = "(" + "+".join(token_str_tokens) + ")"
+
+            if len(values) == 0:
+                return [0], token_str
+            return values, token_str
+
 
 
 class Roll(object):
     token_regexes = OrderedDict(
-            [("die", re.compile(r"^(-?)([0-9]*)(d[0-9]+)(.*)", re.IGNORECASE)),
+            [("die", re.compile(r"^(-?)([0-9]*)(d[0-9]+)((kh|kl|dh|dl)[0-9]+)*(.*)", re.IGNORECASE)),
              ("num", re.compile(r"^(-?[0-9]+)(.*)", re.IGNORECASE)),
              ("add", re.compile(r"^(\+)(.*)", re.IGNORECASE)),
              ("sub", re.compile(r"^(\-)(.*)", re.IGNORECASE)),
              ("mul", re.compile(r"^(\*)(.*)", re.IGNORECASE)),
              ("div", re.compile(r"^(\/)(.*)", re.IGNORECASE)),
              ("exp", re.compile(r"^(\^)(.*)", re.IGNORECASE)),
-             ("lbr", re.compile(r"^(\()(.*)", re.IGNORECASE)),
-             ("rbr", re.compile(r"^(\))(.*)", re.IGNORECASE))])
+             ("lbr", re.compile(r"^(\()(.*)", re.IGNORECASE)), # left bracket
+             ("rbr", re.compile(r"^(\))(.*)", re.IGNORECASE))])# right bracket
     numeric_token = ["die", "num"]
     operator_token = ["add", "sub", "mul", "div", "exp"]
     operator_associativty = {
@@ -100,16 +175,18 @@ class Roll(object):
                     prev_token = token
                     break
                 elif matches and token_type == "die":
-                    sign, num, val, end = matches.group(1, 2, 3, 4)
+                    sign, dice_string, end = matches.group(2, 1, 8)
                     input_str = end
 
-                    if not num:
-                        num = "1"
-                    num = int(num)
-                    val = int(val[1:])
-                    values = Dice(num, val).roll()
+                    # if not num:
+                    #     num = "1"
+                    # num = int(num)
+                    # val = int(val[1:])
+                    # values = Dice(num, val).roll()
+                    # token_str = "(" + "+".join([str(x) for x in values]) + ")"
 
-                    token_str = "(" + "+".join([str(x) for x in values]) + ")"
+                    dice = Dice(dice_string)
+                    values, token_str = dice.roll()
 
                     if sign:
                         token_str = "-" + token_str
@@ -258,4 +335,10 @@ class Roll(object):
 
 
 if __name__ == '__main__':
-    x1 = Roll("-2d6-2d6-2d6")
+    x = Dice("6d6!")
+    print(x.roll())
+    x = Dice("32d25")
+    print(x.roll())
+    x = Dice("5d6kh3dh1")
+    print(x.roll())
+    # x1 = Roll("-2d6-2d6-2d6")
