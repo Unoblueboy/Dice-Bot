@@ -54,6 +54,9 @@ class Dice(object):
             token_str = "(" + "+".join([str(x) for x in values]) + ")"
             return values, token_str
         elif self.operations[0] == "!":
+            # Error out if try to explode die with 1 or less sides
+            if self.sides <= 1:
+                raise Exception("Can't Explode 1 or less sided die")
             # Explode the dice
             additional_rolls = sum([1 for val in values if val == self.sides]) # number of dice with max roll
             while additional_rolls != 0:
