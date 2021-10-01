@@ -101,7 +101,7 @@ class Dice(object):
 
 class Roll(object):
     token_regexes = OrderedDict(
-            [("die", re.compile(r"^(-?)(([0-9]*)(d[0-9]+)((kh|kl|dh|dl)[0-9]+)*)(.*)", re.IGNORECASE)),
+            [("die", re.compile(r"^(-?)(([0-9]*)(d[0-9]+)(!|((kh|kl|dh|dl)[0-9]+)*))(.*)", re.IGNORECASE)),
              ("num", re.compile(r"^(-?[0-9]+)(.*)", re.IGNORECASE)),
              ("add", re.compile(r"^(\+)(.*)", re.IGNORECASE)),
              ("sub", re.compile(r"^(\-)(.*)", re.IGNORECASE)),
@@ -175,7 +175,7 @@ class Roll(object):
                     prev_token = token
                     break
                 elif matches and token_type == "die":
-                    sign, dice_string, end = matches.group(1, 2, 7)
+                    sign, dice_string, end = matches.group(1, 2, 8)
                     input_str = end
 
                     # if not num:
@@ -343,6 +343,6 @@ if __name__ == '__main__':
     print(x.roll())
     x = Dice("2d6kh1")
     print(x.roll())
-    x1 = Roll("-2d6-2d6-2d6kh1")
+    x1 = Roll("-2d6-8d6!-2d6kh1")
     print(x1.final_result)
     print(x1.out_str)
