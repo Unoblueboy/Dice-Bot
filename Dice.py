@@ -2,12 +2,13 @@
 """
 Created on Sun Jul 21 23:31:54 2019
 
-@author: Natha
+@author: Nathan Douglas
 """
 
 from random import randint, shuffle
-import re
 from collections import OrderedDict, deque
+import re
+from Tokens import TokenList
 
 
 class Dice(object):
@@ -15,12 +16,9 @@ class Dice(object):
         self.dice_string = dice_string
         if dice_string[0] == "-":
             self.dice_string = self.dice_string[1:]
-        self.processDiceTokens()
-        # print(self.num)
-        # print(self.sides)
-        # print(self.operations)
+        self._process_dice_tokens()
 
-    def processDiceTokens(self):
+    def _process_dice_tokens(self):
         # Get dice from dice_string
         dice_regex = re.compile(r"^([0-9]*)(d[0-9]+)(.*)", re.IGNORECASE)
         num, sides, end = dice_regex.match(self.dice_string).group(1, 2, 3)
@@ -42,63 +40,91 @@ class Dice(object):
             self.operations.append((op, int(num)))
             op_string = end
 
-
     def roll(self):
-        values = []
-        i = 0
-        while i < self.num:
-            values.append(randint(1, self.sides))
-            i += 1
-        if len(self.operations) == 0:
-            # No operations so simply construct token string
-            token_str = "(" + "+".join([str(x) for x in values]) + ")"
-            return values, token_str
-        elif self.operations[0] == "!":
-            # Error out if try to explode die with 1 or less sides
-            if self.sides <= 1:
-                raise Exception("Can't Explode 1 or less sided die")
-            # Explode the dice
-            additional_rolls = sum([1 for val in values if val == self.sides]) # number of dice with max roll
-            while additional_rolls != 0:
-                new_roll = randint(1, self.sides)
-                values.append(new_roll)
-                if new_roll < self.sides:
-                    additional_rolls -= 1
-
-            #create token string
-            token_str = "(" + "+".join([str(x) for x in values]) + ")"
-            return values, token_str
+        values = self._generate_base_dice_pool()
+        if len(self.operations) == 0 or self.operations[0] == "!":
+            token_str_tokens = [str(val) for val in values]
         else:
-            sorted_values = sorted(values)
-            start_index = 0
-            end_index = len(sorted_values)
-            for op, num in self.operations:
-                if op == "kh":
-                    start_index = max(start_index, end_index - num)
-                elif op == "kl":
-                    end_index = min(end_index, start_index + num)
-                elif op == "dh":
-                    end_index = end_index - num
-                elif op == "dl":
-                    start_index = start_index + num
+            output = self._generate_operation_dice_pool_and_string_tokens(values)
+            values, token_str_tokens = output
+
+        token_str = Dice._generate_token_string(token_str_tokens)
+        return values, token_str
+
+    def _generate_base_dice_pool(self):
+        values = []
+        for _ in range(self.num):
+            new_roll = randint(1, self.sides)
+            values.append(new_roll)
+
+        if len(self.operations) > 0 and self.operations[0] == "!":
+            values = self._generate_exploding_dice(values)
+        return values
+
+    def _generate_exploding_dice(self, values):
+        # Error out if try to explode die with 1 or less sides
+        if self.sides <= 1:
+            raise Exception("Can't Explode 1 or less sided die")
+        # Explode the dice
+        additional_values = []
+        additional_rolls = sum([1 for val in values if val == self.sides])
+        while additional_rolls != 0:
+            new_roll = randint(1, self.sides)
+            additional_values.append(new_roll)
+            if new_roll < self.sides:
+                additional_rolls -= 1
+
+        values += additional_values
+
+        return values
+
+    def _generate_operation_dice_pool(self, sorted_values):
+        # sorted_values = sorted(values)
+        start_index = 0
+        end_index = len(sorted_values)
+        for op, num in self.operations:
+            if op == "kh":
+                start_index = max(start_index, end_index - num)
+            elif op == "kl":
+                end_index = min(end_index, start_index + num)
+            elif op == "dh":
+                end_index = end_index - num
+            elif op == "dl":
+                start_index = start_index + num
+
+        values = sorted_values[start_index:end_index]
+        if len(values) == 0:
+            values = [0]
+        return values, start_index, end_index
+
+    @staticmethod
+    def _generate_operation_string_tokens(sorted_values,
+                                          start_index,
+                                          end_index):
+        str_tokens = []
+        for i in range(len(sorted_values)):
+            val = sorted_values[i]
+            if i < start_index or i >= end_index:
+                str_tokens.append("~~{}~~".format(val))
+            else:
+                str_tokens.append(str(val))
+        shuffle(str_tokens)
+        return str_tokens
+
+    def _generate_operation_dice_pool_and_string_tokens(self, values):
+        sorted_values = sorted(values)
+        values, start_index, end_index = self._generate_operation_dice_pool(
+                                                                sorted_values)
+        str_tokens = Dice._generate_operation_string_tokens(sorted_values,
+                                                            start_index,
+                                                            end_index)
+        return values, str_tokens
+
+    @staticmethod
+    def _generate_token_string(str_tokens):
+        return "(" + "+".join(str_tokens) + ")"
 
 
-            values = sorted_values[start_index:end_index]
-
-            token_str_tokens = []
-            for i in range(len(sorted_values)):
-                val = sorted_values[i]
-                if i < start_index or i >= end_index:
-                    token_str_tokens.append("~~{}~~".format(val))
-                else:
-                    token_str_tokens.append(str(val))
-            shuffle(token_str_tokens)
-
-            token_str = "(" + "+".join(token_str_tokens) + ")"
-
-            if len(values) == 0:
-                return [0], token_str
-            return values, token_str
 
 
 
@@ -111,11 +137,11 @@ class Roll(object):
              ("mul", re.compile(r"^(\*)(.*)", re.IGNORECASE)),
              ("div", re.compile(r"^(\/)(.*)", re.IGNORECASE)),
              ("exp", re.compile(r"^(\^)(.*)", re.IGNORECASE)),
-             ("lbr", re.compile(r"^(\()(.*)", re.IGNORECASE)), # left bracket
-             ("rbr", re.compile(r"^(\))(.*)", re.IGNORECASE))])# right bracket
+             ("lbr", re.compile(r"^(\()(.*)", re.IGNORECASE)),  # left bracket
+             ("rbr", re.compile(r"^(\))(.*)", re.IGNORECASE))])  # right bracket
     numeric_token = ["die", "num"]
     operator_token = ["add", "sub", "mul", "div", "exp"]
-    operator_associativty = {
+    operator_associativity = {
             "add": "L",
             "sub": "L",
             "mul": "L",
@@ -150,6 +176,8 @@ class Roll(object):
         self.out_str, self.roll_tokens = self.get_tokens(input_str)
         self.rpn = self.shunting_yard(self.roll_tokens)
         self.final_result = self.parse_rpn(self.rpn)
+
+    # TODO: change get tokens such that the ending token list is a list of objects of class Token
 
     def get_tokens(self, input_str):
         out_str = ""
@@ -210,6 +238,8 @@ class Roll(object):
                 raise Exception("STOP!!! YOU HAVE DONE SOMETHING ILLEGAL")
         return out_str, tokens
 
+    # TODO: Change the algorithm so ending list is a list of objects of class Token
+
     def shunting_yard(self, tokens):
         input_tokens = deque(tokens)
         output_queue = deque()
@@ -239,7 +269,7 @@ class Roll(object):
                         Roll.operator_precedence[op_name]
                     condition4 = Roll.operator_precedence[top_name] ==\
                         Roll.operator_precedence[op_name]
-                    condition5 = Roll.operator_associativty[top_name] == "L"
+                    condition5 = Roll.operator_associativity[top_name] == "L"
                     condition6 = not Roll.is_in_category(
                         operator_stack[-1], ["lbr"])
                 while len(operator_stack) != 0 and condition6 and\
@@ -257,7 +287,7 @@ class Roll(object):
                             Roll.operator_precedence[op_name]
                         condition4 = Roll.operator_precedence[top_name] ==\
                             Roll.operator_precedence[op_name]
-                        condition5 = Roll.operator_associativty[top_name] ==\
+                        condition5 = Roll.operator_associativity[top_name] ==\
                             "L"
                         condition6 = not Roll.is_in_category(
                             operator_stack[-1], ["lbr"])
@@ -286,6 +316,8 @@ class Roll(object):
             output_queue.append(operator_stack.pop())
 
         return output_queue
+
+    # TODO: Change Parser to allow for use of tokens, so we can have more variable
 
     def parse_rpn(self, rpn):
         result_stack = []
@@ -321,13 +353,14 @@ class Roll(object):
                         raise Exception("This is an illegal operation")
                     continue
         if len(result_stack) != 1:
-            raise Exception("AN ERROR HAS OCCURRED, FIX IT BISCH")
+            raise Exception("AN ERROR HAS OCCURRED, FIX IT BITCH")
         else:
             result = result_stack[0]
             if result % 1 == 0:
                 result = int(result)
             return result
 
+    @staticmethod
     def is_in_category(token, category):
         for token_type in category:
             match = Roll.token_regexes[token_type].match(token)
@@ -349,3 +382,34 @@ if __name__ == '__main__':
     x1 = Roll("-2d6-8d6!-2d6kh1")
     print(x1.final_result)
     print(x1.out_str)
+
+    t = TokenList()
+    t.printTokens()
+
+    from pprint import pprint
+    # from TokenParser import get_tokens, shunting_yard
+    #
+    # print()
+    # pprint([str(x) for x in get_tokens("1+2+3")])
+    # print()
+    # pprint([str(x) for x in get_tokens("1+2+3d6")])
+    # print()
+    # pprint([str(x) for x in get_tokens("-2d6+-2d6-2d6")])
+    # print()
+    # pprint([str(x) for x in get_tokens("-2d6+-2d6-2d6")])
+    # print()
+    # pprint([str(x) for x in get_tokens("max(1, 2)")])
+    # print()
+    # print([str(x) for x in get_tokens("max(-2d6+-2d6-2d6, 1+2+3d6, 23, 5 + 4)")])
+    # print()
+    # # pprint(test_get_tokens("-2d6+-2d6-2d6"))
+    #
+    # print([str(x) for x in shunting_yard(get_tokens("-2d6+-2d6-2d6"))])
+    # print()
+    # print([str(x) for x in shunting_yard(get_tokens("max(1, 2)"))])
+    # print()
+    # print([str(x) for x in shunting_yard(get_tokens("max(-2d6+-2d6-2d6, 1+2+3d6, 23, 5 + 4)"))])
+    # print()
+    # print(shunting_yard(get_tokens("max(-2d6+-2d6-2d6, 1+2+3d6, 23, max(5 + 4, 22d6))")))
+    # print()
+    # pprint(test_shunting_yard(test_get_tokens("-2d6+-2d6-2d6")))
