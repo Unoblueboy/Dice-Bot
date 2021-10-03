@@ -2,6 +2,7 @@ from Tokens import TokenList, TokenType, TokenAssociativity, Token
 from collections import deque
 from enum import Enum
 from typing import Union, List
+from pptree import print_tree
 
 
 class NodeType(Enum):
@@ -222,24 +223,30 @@ class ParseTree(object):
 
     def evaluate(self):
         res_string, res_value = self.root.eval()
-        return "{} = {}".format(res_string, res_value)
+        if (type(res_value) in [int, float]) and (int(res_value) == res_value):
+            res_value = int(res_value)
+        return res_string, res_value
+
+    def print_tree(self):
+        print_tree(self.root, "_children")
 
 
 if __name__ == "__main__":
     x = ParseTree("max(-2d6+-2d6-2d6, 1+2+3d6!, 23, max(5 + 4, 22d6kh3))")
     print(x.root.token)
-
-    from pptree import print_tree
-
-    print_tree(x.root, "_children")
     print(x.evaluate())
 
     x2 = ParseTree("rep(5d6kh3, 6)")
     print(x2.root.token)
-    print_tree(x2.root, "_children")
+    x2.print_tree()
     print(x2.evaluate())
 
     x3 = ParseTree("2-1")
     print(x3.root.token)
-    print_tree(x3.root, "_children")
+    x3.print_tree()
     print(x3.evaluate())
+
+    x4 = ParseTree("(1+2)/(3+4)")
+    print(x4.root.token)
+    x4.print_tree()
+    print(x4.evaluate())
