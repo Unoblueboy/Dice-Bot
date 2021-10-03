@@ -1,4 +1,7 @@
 from enum import Enum
+from Dice import Dice
+from typing import Callable
+from Functions import _max, _genBinaryOperationEvalFunction, _unitaryMinus, _rep
 import re
 
 
@@ -49,6 +52,9 @@ class NumericToken(Token):
         token.value = value
         return token
 
+    def eval(self, result_strings="", result_values=0):
+        return self.value, int(self.value)
+
     def __repr__(self):
         s = super(NumericToken, self).__repr__()
         s += """
@@ -71,9 +77,10 @@ class DiceToken(NumericToken):
         self.value = None
         self.dice = None
 
-    def evalDice(self):
-        # TODO: evaluate dice in DiceToken
-        pass
+    def eval(self, result_strings="", result_values=0):
+        self.dice = Dice(self.value)
+        values, token_str = self.dice.roll()
+        return token_str, sum(values)
 
 
 class NonNumericToken(Token):
@@ -83,11 +90,13 @@ class NonNumericToken(Token):
                  token: str,
                  associativity: TokenAssociativity,
                  precedence: int,
-                 token_type: TokenType):
+                 token_type: TokenType,
+                 eval_function: Callable):
+        super(NonNumericToken, self).__init__(name, regex_str, token_type)
         self.token = token
         self.associativity = associativity
         self.precedence = precedence
-        super(NonNumericToken, self).__init__(name, regex_str, token_type)
+        self.eval = eval_function
 
     def __repr__(self):
         s = super(NonNumericToken, self).__repr__()
@@ -105,10 +114,17 @@ class NonNumericToken(Token):
 
 
 class FunctionToken(NonNumericToken):
-    def __init__(self, name: str):
+    def __init__(self, name: str, eval_function: Callable, node_callable=False):
         self.arity = 0
         regex_str = r"({})(.*)".format(name)
-        super(FunctionToken, self).__init__(name, regex_str, name, TokenAssociativity.LEFT, 0, TokenType.FUNCTION)
+        super(FunctionToken, self).__init__(name,
+                                            regex_str,
+                                            name,
+                                            TokenAssociativity.LEFT,
+                                            0,
+                                            TokenType.FUNCTION,
+                                            eval_function)
+        self.node_callable = node_callable
 
     def __repr__(self):
         s = super(FunctionToken, self).__repr__()
@@ -117,7 +133,7 @@ class FunctionToken(NonNumericToken):
         return s
 
     def copyWithArity(self, arity):
-        new_token = FunctionToken(self.name)
+        new_token = FunctionToken(self.name, self.eval, self.node_callable)
         new_token.arity = arity
         return new_token
 
@@ -136,32 +152,36 @@ class TokenList(object):
         self.addBinaryOperatorToken("add",
                                     "+",
                                     TokenAssociativity.LEFT,
-                                    2)
+                                    2,
+                                    _genBinaryOperationEvalFunction("+", "+"))
         self.addBinaryOperatorToken("subtract",
                                     "-",
                                     TokenAssociativity.LEFT,
-                                    2)
+                                    2,
+                                    _genBinaryOperationEvalFunction("-", "-"))
         self.addBinaryOperatorToken("multiply",
                                     "*",
                                     TokenAssociativity.LEFT,
-                                    3)
+                                    3,
+                                    _genBinaryOperationEvalFunction("*", "*"))
         self.addBinaryOperatorToken("divide",
                                     "/",
                                     TokenAssociativity.LEFT,
-                                    3)
+                                    3,
+                                    _genBinaryOperationEvalFunction("/", "/"))
         self.addBinaryOperatorToken("power",
                                     "^",
                                     TokenAssociativity.RIGHT,
-                                    4)
+                                    4,
+                                    _genBinaryOperationEvalFunction("^", "**"))
 
         # Unary operators
-        # TODO: Properly handle unary minus
         self.addUnaryOperatorToken("Unary Minus",
-                                   "-")
+                                   "-", _unitaryMinus)
 
         # functions
-        # TODO: Implement a dedicated function token class
-        self.addFunctionToken("max")
+        self.addFunctionToken("max", _max)
+        self.addFunctionToken("rep", _rep, node_callable=True)
 
         # Brackets
         self.addBracketToken("left bracket", "(", TokenType.LEFT_BRACKET)
@@ -182,32 +202,41 @@ class TokenList(object):
                                name: str,
                                token: str,
                                associativity: TokenAssociativity,
-                               precedence: int):
+                               precedence: int,
+                               eval_function: Callable):
         regex = r"^(\{})(.*)".format(token)
-        token = NonNumericToken(name, regex, token, associativity, precedence, TokenType.BINARY_OPERATOR)
+        token = NonNumericToken(name, regex, token, associativity, precedence, TokenType.BINARY_OPERATOR, eval_function)
         self.tokens.append(token)
 
     def addUnaryOperatorToken(self,
                               name: str,
-                              token: str):
+                              token: str,
+                              eval_function: Callable):
         regex = r"^(\{})(.*)".format(token)
-        token = NonNumericToken(name, regex, token, TokenAssociativity.LEFT, 4, TokenType.UNARY_OPERATOR)
+        token = NonNumericToken(name, regex, token, TokenAssociativity.LEFT, 4, TokenType.UNARY_OPERATOR, eval_function)
         self.tokens.append(token)
 
-    def addBracketToken(self, name, token, token_type):
+    def addBracketToken(self,
+                        name: str,
+                        token: str,
+                        token_type: TokenType):
         regex = r"^(\{})(.*)".format(token)
-        token = NonNumericToken(name, regex, token, TokenAssociativity.LEFT, 1, token_type)
+        token = NonNumericToken(name, regex, token, TokenAssociativity.LEFT, 1, token_type, lambda: None)
         self.tokens.append(token)
 
     def addCommaToken(self):
-        token = NonNumericToken("comma", r"^(\,)(.*)", ",", TokenAssociativity.LEFT, 1, TokenType.COMMA)
+        token = NonNumericToken("comma", r"^(\,)(.*)", ",", TokenAssociativity.LEFT, 1, TokenType.COMMA, lambda: None)
         self.tokens.append(token)
 
-    def addFunctionToken(self, name):
-        token = FunctionToken(name)
+    def addFunctionToken(self,
+                         name: str,
+                         eval_function: Callable,
+                         node_callable=False):
+        token = FunctionToken(name, eval_function, node_callable)
         self.tokens.append(token)
 
-    def getTokenFromName(self, name: str):
+    def getTokenFromName(self,
+                         name: str):
         for token in self.tokens:
             if token.name == name:
                 return token
@@ -217,3 +246,5 @@ class TokenList(object):
     def printTokens(self):
         for token in self.tokens:
             print(token)
+
+

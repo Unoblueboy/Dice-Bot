@@ -1,19 +1,71 @@
-from Tokens import TokenList, TokenType, TokenAssociativity
+from Tokens import TokenList, TokenType, TokenAssociativity, Token
 from collections import deque
+from enum import Enum
+from typing import Union, List
 
 
+class NodeType(Enum):
+    LEAF = 1
+    ROOT = 2
+    INTERNAL = 3
 
 
-# Shunting Yard Algorithm as described in the following pages
-# https://wcipeg.com/wiki/Shunting_yard_algorithm
-# https://en.wikipedia.org/wiki/Shunting-yard_algorithm
+# noinspection PyUnresolvedReferences
+class Node(object):
+    def __init__(self, token: Token):
+        self.token = token
+        self.node_type = self._defineNodeType()
+        self.token_type = self.token.type
+        self._children = deque()
+
+    def _defineNodeType(self):
+        if self.token.type in [TokenType.NUMERIC, TokenType.DICE]:
+            return NodeType.LEAF
+        return NodeType.INTERNAL
+
+    def addChild(self, node):
+        self._children.appendleft(node)
+
+    def getChildren(self):
+        return self._children
+
+    def eval(self) -> (str, Union[float, List[float]]):
+        if self.node_type == NodeType.LEAF:
+            out_string, out_value = self.token.eval()
+        elif self.token_type != TokenType.FUNCTION:
+            result_strings = []
+            result_values = []
+            for child in self.getChildren():
+                res_string, res_value = child.eval()
+                result_strings.append(res_string)
+                result_values.append(res_value)
+            out_string, out_value = self.token.eval(result_strings, result_values)
+        elif self.token_type == TokenType.FUNCTION:
+            if self.token.node_callable:
+                out_string, out_value = self.token.eval(self.getChildren())
+            else:
+                result_strings = []
+                result_values = []
+                for child in self.getChildren():
+                    res_string, res_value = child.eval()
+                    result_strings.append(res_string)
+                    result_values.append(res_value)
+                out_string, out_value = self.token.eval(result_strings, result_values)
+        else:
+            raise Exception("Unknown Token/ Node Type")
+
+        return out_string, out_value
+
+    def __str__(self):
+        return ' '+str(self.token)+' '
 
 
 class ParseTree(object):
     def __init__(self, input_string):
         self.input_string = input_string.replace(" ", "")
-        infix_tokens = self._get_tokens(input_string)
-        postfix_tokens = self._shunting_yard(infix_tokens)
+        self.infix_tokens = self._get_tokens(self.input_string)
+        self.postfix_tokens = self._shunting_yard(self.infix_tokens)
+        self.node_list, self.root = self._generate_parse_tree(self.postfix_tokens)
 
     @staticmethod
     def _get_tokens(input_str):
@@ -52,16 +104,18 @@ class ParseTree(object):
 
         return tokens
 
+    # Shunting Yard Algorithm as described in the following pages
+    # https://wcipeg.com/wiki/Shunting_yard_algorithm
+    # https://en.wikipedia.org/wiki/Shunting-yard_algorithm
     @staticmethod
-    def _shunting_yard(tokens):
-        input_token_queue = deque(tokens)
+    def _shunting_yard(infix_tokens):
+        input_token_queue = deque(infix_tokens)
         output_queue = deque()
         operator_stack = deque()
         arity_stack = deque()
 
         while len(input_token_queue) > 0:
             token = input_token_queue.popleft()
-            print(token)
             token_type = token.type
             if token_type in [TokenType.NUMERIC, TokenType.DICE]:
                 output_queue.append(token)
@@ -72,8 +126,8 @@ class ParseTree(object):
                 while (len(operator_stack) > 0) and (operator_stack[-1].type not in [TokenType.LEFT_BRACKET]):
                     op_token = operator_stack[-1]
                     if (op_token.precedence <= token.precedence) and \
-                            (
-                                    op_token.precedence != token.precedence or token.associativity == TokenAssociativity.RIGHT):
+                            (op_token.precedence != token.precedence or
+                             token.associativity == TokenAssociativity.RIGHT):
                         break
                     op_token = operator_stack.pop()
                     if op_token.type == TokenType.FUNCTION:
@@ -124,3 +178,68 @@ class ParseTree(object):
             output_queue.append(op_token)
 
         return output_queue
+
+    @staticmethod
+    def _generate_parse_tree(postfix_tokens):
+        evaluation_stack = deque()
+        node_list = []
+
+        for token in postfix_tokens:
+            new_node = Node(token)
+            node_list.append(new_node)
+
+            if new_node.node_type == NodeType.LEAF:
+                evaluation_stack.append(new_node)
+                continue
+
+            token_type = token.type
+            if token_type == TokenType.BINARY_OPERATOR:
+                child1 = evaluation_stack.pop()
+                child2 = evaluation_stack.pop()
+                new_node.addChild(child1)
+                new_node.addChild(child2)
+                evaluation_stack.append(new_node)
+            elif token_type == TokenType.UNARY_OPERATOR:
+                child = evaluation_stack.pop()
+                new_node.addChild(child)
+                evaluation_stack.append(new_node)
+            elif token_type == TokenType.FUNCTION:
+                arity = token.arity
+                for _ in range(arity):
+                    child = evaluation_stack.pop()
+                    new_node.addChild(child)
+                evaluation_stack.append(new_node)
+            else:
+                raise Exception("Illegal token in postfix_tokens")
+
+        if len(evaluation_stack) != 1:
+            raise Exception("Should only be one element left in the Evaluation Stack, the root")
+
+        root = evaluation_stack[0]
+        root.node_type = NodeType.ROOT
+
+        return node_list, root
+
+    def evaluate(self):
+        res_string, res_value = self.root.eval()
+        return "{} = {}".format(res_string, res_value)
+
+
+if __name__ == "__main__":
+    x = ParseTree("max(-2d6+-2d6-2d6, 1+2+3d6!, 23, max(5 + 4, 22d6kh3))")
+    print(x.root.token)
+
+    from pptree import print_tree
+
+    print_tree(x.root, "_children")
+    print(x.evaluate())
+
+    x2 = ParseTree("rep(5d6kh3, 6)")
+    print(x2.root.token)
+    print_tree(x2.root, "_children")
+    print(x2.evaluate())
+
+    x3 = ParseTree("2-1")
+    print(x3.root.token)
+    print_tree(x3.root, "_children")
+    print(x3.evaluate())
