@@ -21,6 +21,8 @@ class Dice(object):
         # Get dice from dice_string
         dice_regex = re.compile(r"^([0-9]*)(d[0-9]+)(.*)", re.IGNORECASE)
         num, sides, end = dice_regex.match(self.dice_string).group(1, 2, 3)
+        if num == "":
+            num = "1"
         self.num = int(num)
         self.sides = int(sides[1:])
 

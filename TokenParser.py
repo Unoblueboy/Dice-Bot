@@ -275,3 +275,8 @@ if __name__ == "__main__":
     print(x4.root.token)
     # x4.print_tree()
     print(x4.evaluate())
+
+    x5 = ParseTree("d6")
+    print(x5.root.token)
+    # x4.print_tree()
+    print(x5.evaluate())
