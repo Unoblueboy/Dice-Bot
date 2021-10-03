@@ -113,6 +113,26 @@ class NonNumericToken(Token):
         return self.token
 
 
+class BinaryOperatorToken(NonNumericToken):
+    def __init__(self,
+                 name: str,
+                 regex_str: str,
+                 token: str,
+                 associativity: TokenAssociativity,
+                 precedence: int,
+                 eval_function: Callable,
+                 commutative: bool = True
+                 ):
+        super(BinaryOperatorToken, self).__init__(name,
+                                                  regex_str,
+                                                  token,
+                                                  associativity,
+                                                  precedence,
+                                                  TokenType.BINARY_OPERATOR,
+                                                  eval_function)
+        self.commutative = commutative
+
+
 class FunctionToken(NonNumericToken):
     def __init__(self, name: str, eval_function: Callable, node_callable=False):
         self.arity = 0
@@ -158,7 +178,8 @@ class TokenList(object):
                                     "-",
                                     TokenAssociativity.LEFT,
                                     2,
-                                    _genBinaryOperationEvalFunction("-", "-"))
+                                    _genBinaryOperationEvalFunction("-", "-"),
+                                    False)  # Non-Commutative
         self.addBinaryOperatorToken("multiply",
                                     "*",
                                     TokenAssociativity.LEFT,
@@ -168,12 +189,14 @@ class TokenList(object):
                                     "/",
                                     TokenAssociativity.LEFT,
                                     3,
-                                    _genBinaryOperationEvalFunction("/", "/"))
+                                    _genBinaryOperationEvalFunction("/", "/"),
+                                    False)  # Non-Commutative
         self.addBinaryOperatorToken("power",
                                     "^",
                                     TokenAssociativity.RIGHT,
                                     4,
-                                    _genBinaryOperationEvalFunction("^", "**"))
+                                    _genBinaryOperationEvalFunction("^", "**"),
+                                    False)  # Non-Commutative
 
         # Unary operators
         self.addUnaryOperatorToken("Unary Minus",
@@ -203,9 +226,10 @@ class TokenList(object):
                                token: str,
                                associativity: TokenAssociativity,
                                precedence: int,
-                               eval_function: Callable):
+                               eval_function: Callable,
+                               commutative: bool = True):
         regex = r"^(\{})(.*)".format(token)
-        token = NonNumericToken(name, regex, token, associativity, precedence, TokenType.BINARY_OPERATOR, eval_function)
+        token = BinaryOperatorToken(name, regex, token, associativity, precedence, eval_function, commutative)
         self.tokens.append(token)
 
     def addUnaryOperatorToken(self,
