@@ -23,7 +23,7 @@ file_path = os.path.join(script_dir, "data.json")
 bot = commands.Bot(command_prefix='/')
 slash = SlashCommand(bot, sync_commands=True)
 
-guild_ids = [469720401925111818]  # , 199725359078440960]
+guild_ids = [469720401925111818, 199725359078440960]
 
 
 def initialize():
