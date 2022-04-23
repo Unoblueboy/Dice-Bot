@@ -12,10 +12,10 @@ from discord import Permissions
 from discord_slash import SlashCommand
 from discord_slash.utils.manage_commands import create_option
 
-from TokenParser import ParseTree
-
 import os
 import json
+
+from Evaluation.Evaluation import evaluate_roll_string
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 file_path = os.path.join(script_dir, "data.json")
@@ -201,8 +201,7 @@ def roll_message(author_id, dice_string, name=None):
     data = get_data()
     try:
         dice_string = dice_string.strip()
-        pt = ParseTree(dice_string)
-        out_str, out_val = pt.evaluate()
+        out_str, out_val = evaluate_roll_string(dice_string)
         if (author_id not in data) and (name is None or (len(name) == 0)):
             message = "<@{}>: `{}` = {} = {}".format(author_id,
                                                      dice_string,
