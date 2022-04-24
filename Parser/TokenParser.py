@@ -18,7 +18,7 @@ def find_matching_tokens(remaining_string) -> Dict:
         }
 
     if len(matching_tokens_data) == 0:
-        raise Exception("Unknown token")
+        raise Exception(f"Unknown token: {remaining_string}")
 
     return matching_tokens_data
 

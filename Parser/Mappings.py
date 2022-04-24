@@ -11,6 +11,7 @@ RegexTokenMapping: Dict[str, Pattern] = {
     "power": re.compile(r"^(\^)(.*)", re.IGNORECASE),
     "unary minus": re.compile(r"^(-)(.*)", re.IGNORECASE),
     "max": re.compile(r"^(max)(.*)", re.IGNORECASE),
+    "min": re.compile(r"^(min)(.*)", re.IGNORECASE),
     "rep": re.compile(r"^(rep)(.*)", re.IGNORECASE),
     "left bracket": re.compile(r"^(\()(.*)", re.IGNORECASE),
     "right bracket": re.compile(r"^(\))(.*)", re.IGNORECASE),

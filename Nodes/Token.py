@@ -314,6 +314,11 @@ class TokenFactory(object):
                 "max",
                 _max
             )
+        if token_name == "min":
+            return FunctionToken(
+                "min",
+                _min
+            )
         if token_name == "rep":
             return FunctionToken(
                 "rep",
@@ -389,7 +394,13 @@ def _genUnaryOperatorFunction(
 def validateNumericEval(res_strings: Tuple[str, ...], res_tokens: Tuple["Token", ...]):
     assert len(res_strings) == 1
     assert len(res_tokens) == 1
-    # assert isinstance(res_tokens, NumericToken)
+    assert isinstance(res_tokens[0], NumericToken)
+
+
+def validateNumericEvalList(res_strings: Tuple[str, ...], res_tokens: Tuple["Token", ...]):
+    assert len(res_strings) == 1
+    for token in res_tokens:
+        assert isinstance(token, NumericToken)
 
 
 def _rep(children: Tuple["Token", ...]) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
@@ -412,7 +423,7 @@ def _rep(children: Tuple["Token", ...]) -> Tuple[Tuple[str, ...], Tuple["Token",
         result_strings += res_strings
         result_tokens += res_tokens
 
-    out_string = "{" + ", ".join(result_strings) + "}"
+    out_string = "[" + ", ".join(result_strings) + "]"
     out_tokens = result_tokens
     return (out_string, ), tuple(out_tokens)
 
@@ -423,11 +434,27 @@ def _max(children: Tuple["Token", ...]) -> Tuple[Tuple[str, ...], Tuple["Token",
 
     for child in children:
         res_strings, res_tokens = child.eval()
-        validateNumericEval(res_strings, res_tokens)
+        validateNumericEvalList(res_strings, res_tokens)
         child_strings += res_strings
         child_tokens += res_tokens
 
     out_string = ", ".join(child_strings)
     out_string = "max(" + out_string + ")"
     out_value = max([token.value for token in child_tokens])
+    return (out_string, ), (NumericToken("num", out_value), )
+
+
+def _min(children: Tuple["Token", ...]) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
+    child_strings = []
+    child_tokens: List[NumericToken] = []
+
+    for child in children:
+        res_strings, res_tokens = child.eval()
+        validateNumericEvalList(res_strings, res_tokens)
+        child_strings += res_strings
+        child_tokens += res_tokens
+
+    out_string = ", ".join(child_strings)
+    out_string = "min(" + out_string + ")"
+    out_value = min([token.value for token in child_tokens])
     return (out_string, ), (NumericToken("num", out_value), )
