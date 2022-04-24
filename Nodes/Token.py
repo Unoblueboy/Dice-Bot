@@ -1,6 +1,6 @@
 import abc
 from enum import Enum
-from typing import Callable, List, Tuple
+from typing import Callable, Generic, List, Tuple, TypeVar
 
 from Dice import Dice
 
@@ -32,6 +32,7 @@ class Token(object):
         self.type = token_type
         self._children: List["Token", ...] = []
 
+    @abc.abstractmethod
     def eval(self) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
         """Method documentation"""
         raise NotImplementedError("The method eval was not implemented")
@@ -43,29 +44,44 @@ class Token(object):
         return self._children
 
     def __repr__(self):
-        s = """
-name:               {},
-    type:           {}""".format(self.name, self.type.name)
+        additional_repr = self.__get_additional_repr__()
+        if len(additional_repr) > 0:
+            return f"<[{self.__class__.__name__}] name: {self.name}, type: {self.type.name}, {additional_repr}>"
+        else:
+            return f"<[{self.__class__.__name__}] name: {self.name}, type: {self.type.name}>"
 
-        return s
+    def __get_additional_repr__(self) -> str:
+        return ""
+
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, Token):
+            return (self.name == other.name) and (self.type == other.type)
+        return False
 
 
-class NumericToken(Token):
+V = TypeVar('V')
+
+
+class ValueToken(Token, Generic[V]):
     def __init__(self,
                  name: str,
-                 value: float):
-        super(NumericToken, self).__init__(name, TokenType.NUMERIC)
-        self.value = value
+                 token_type: TokenType,
+                 value: V):
+        super(ValueToken, self).__init__(name, token_type)
+        self.value: V = value
 
     def eval(self) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
-        result_node = NumericToken("num", self.value)
-        return (str(self.value),), (result_node,)
+        raise NotImplementedError()
 
-    def __repr__(self):
-        s = super(NumericToken, self).__repr__()
-        s += """
-    value:          {}""".format(self.value)
+    def __eq__(self, other):
+        """Overrides the default implementation"""
+        if isinstance(other, ValueToken):
+            return (self.name == other.name) and (self.type == other.type) and (self.value == other.value)
+        return False
 
+    def __get_additional_repr__(self):
+        s = f"value: {self.value}"
         return s
 
     def __str__(self):
@@ -74,12 +90,22 @@ class NumericToken(Token):
         return self.value
 
 
-class DiceToken(Token):
+class NumericToken(ValueToken[float]):
+    def __init__(self,
+                 name: str,
+                 value: float):
+        super(NumericToken, self).__init__(name, TokenType.NUMERIC, value)
+
+    def eval(self) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
+        result_node = NumericToken("num", self.value)
+        return (str(self.value),), (result_node,)
+
+
+class DiceToken(ValueToken[str]):
     def __init__(self,
                  name: str,
                  value: str):
-        super(DiceToken, self).__init__(name, TokenType.DICE)
-        self.value = value
+        super(DiceToken, self).__init__(name, TokenType.DICE, value)
         self.dice = Dice(value)
 
     def eval(self) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
@@ -87,22 +113,15 @@ class DiceToken(Token):
         result_node = NumericToken(self.value, sum(values))
         return (token_str,), (result_node,)
 
-    def __repr__(self):
-        s = super(DiceToken, self).__repr__()
-        s += """
-    value:          {}""".format(self.value)
 
-        return s
-
-
-class NonNumericToken(Token):
+class NonValueToken(Token):
     def __init__(self,
                  name: str,
                  token: str,
                  associativity: TokenAssociativity,
                  precedence: int,
                  token_type: TokenType):
-        super(NonNumericToken, self).__init__(name, token_type)
+        super(NonValueToken, self).__init__(name, token_type)
         self.token = token
         self.associativity = associativity
         self.precedence = precedence
@@ -110,22 +129,15 @@ class NonNumericToken(Token):
     def eval(self) -> Tuple[Tuple[str, ...], Tuple["Token", ...]]:
         raise NotImplementedError("eval not implemented")
 
-    def __repr__(self):
-        s = super(NonNumericToken, self).__repr__()
-        s += """
-    token:          {}
-    associativity:  {},
-    precedence:     {}""".format(self.token,
-                                 self.associativity.name,
-                                 self.precedence)
-
+    def __get_additional_repr__(self) -> str:
+        s = f"token: {self.token},associativity: {self.associativity.name}, precedence: {self.precedence}"
         return s
 
     def __str__(self):
         return self.token
 
 
-class BinaryOperatorToken(NonNumericToken):
+class BinaryOperatorToken(NonValueToken):
     def __init__(self,
                  name: str,
                  token: str,
@@ -181,7 +193,7 @@ class BinaryOperatorToken(NonNumericToken):
         return self.eval_function(tuple(result_strings), tuple(result_values))
 
 
-class UnaryOperatorToken(NonNumericToken):
+class UnaryOperatorToken(NonValueToken):
     def __init__(self,
                  name: str,
                  token: str,
@@ -211,7 +223,7 @@ class UnaryOperatorToken(NonNumericToken):
         return self.eval_function(result_string, result_token)
 
 
-class FunctionToken(NonNumericToken):
+class FunctionToken(NonValueToken):
     def __init__(self,
                  name: str,
                  eval_function: Callable[[Tuple["Token", ...]],
@@ -228,10 +240,9 @@ class FunctionToken(NonNumericToken):
         child_nodes = self.getChildren()
         return self.eval_function(tuple(child_nodes))
 
-    def __repr__(self):
-        s = super(FunctionToken, self).__repr__()
-        s += """
-    arity:          {}""".format(self.arity)
+    def __get_additional_repr__(self) -> str:
+        s = super(FunctionToken, self).__get_additional_repr__()
+        s += f"arity: {self.arity}"
         return s
 
 
@@ -327,7 +338,7 @@ class TokenFactory(object):
 
         # Brackets
         if token_name == "left bracket":
-            return NonNumericToken(
+            return NonValueToken(
                 "left bracket",
                 "(",
                 TokenAssociativity.LEFT,
@@ -335,7 +346,7 @@ class TokenFactory(object):
                 TokenType.LEFT_BRACKET
             )
         if token_name == "right bracket":
-            return NonNumericToken(
+            return NonValueToken(
                 "right bracket",
                 ")",
                 TokenAssociativity.LEFT,
@@ -345,7 +356,7 @@ class TokenFactory(object):
 
         # Comma
         if token_name == "comma":
-            return NonNumericToken(
+            return NonValueToken(
                 "comma",
                 ",",
                 TokenAssociativity.LEFT,

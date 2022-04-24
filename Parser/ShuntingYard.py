@@ -1,7 +1,7 @@
 from collections import deque
 from typing import List
 
-from Nodes.Token import BinaryOperatorToken, NonNumericToken, FunctionToken, Token, TokenAssociativity, TokenType
+from Nodes.Token import BinaryOperatorToken, NonValueToken, FunctionToken, Token, TokenAssociativity, TokenType
 
 from Parser.TokenParser import get_tokens
 
@@ -26,7 +26,7 @@ def shunting_yard(infix_tokens: List[Token]):
         elif token_type == TokenType.BINARY_OPERATOR:
             token: BinaryOperatorToken
             while (len(operator_stack) > 0) and (operator_stack[-1].type not in [TokenType.LEFT_BRACKET]):
-                op_token: NonNumericToken = operator_stack[-1]
+                op_token: NonValueToken = operator_stack[-1]
                 if (op_token.precedence <= token.precedence) and \
                         (op_token.precedence != token.precedence or
                          token.associativity == TokenAssociativity.RIGHT):
@@ -44,7 +44,7 @@ def shunting_yard(infix_tokens: List[Token]):
                 raise Exception("Mismatched Brackets")
 
             while operator_stack[-1].type != TokenType.LEFT_BRACKET:
-                op_token: NonNumericToken = operator_stack.pop()
+                op_token: NonValueToken = operator_stack.pop()
                 if op_token.type == TokenType.FUNCTION:
                     op_token: FunctionToken
                     op_token.arity = arity_stack.pop()
@@ -67,7 +67,7 @@ def shunting_yard(infix_tokens: List[Token]):
                 continue
 
             while operator_stack[-1].type != TokenType.LEFT_BRACKET:
-                op_token: NonNumericToken = operator_stack.pop()
+                op_token: NonValueToken = operator_stack.pop()
                 if op_token.type == TokenType.FUNCTION:
                     op_token: FunctionToken
                     op_token.arity = arity_stack.pop()
