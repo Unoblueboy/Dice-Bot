@@ -3,12 +3,9 @@ import unittest
 from Evaluation.Evaluation import evaluate_roll_string
 
 
-class TestParse(unittest.TestCase):
-    def test_node(self):
-        assert True
-
-    def test_parse_tree_2(self):
-        with open("cases.txt", "r") as file:
+class TestEvaluation(unittest.TestCase):
+    def test_bracketing(self):
+        with open("bracket_cases.txt", "r") as file:
             lines = file.readlines()
         num_subtests = len(lines)
         for i in range(num_subtests):
